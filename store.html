@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Store CEM Status</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f0f2f5;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    .container {
+      text-align: center;
+    }
+    .status-box {
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      text-align: center;
+      background: white;
+      width: 300px;
+      margin-top: 20px;
+    }
+    .status {
+      font-size: 48px;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    .open {
+      color: green;
+    }
+    .closed {
+      color: red;
+    }
+    .error {
+      color: orange;
+    }
+    .last-closed {
+      font-size: 20px;  /* Increased font size */
+      color: #4a90e2;   /* Set color to a subtle blue */
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    h1 {
+      font-size: 36px;
+      color: #333;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Store CEM</h1>
+  <h2>status</h2>
+  <div class="status-box">
+    <div id="storeStatus" class="status">Loading...</div>
+    <div id="lastClosedTime" class="last-closed"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+<script>
+  // Initialize Firebase
+  const firebaseConfig = {
+    databaseURL: "https://doorstatus-9bb3d-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  const dbRef = firebase.database().ref('storeStatus');
+
+  function updateStatus(status, time, lastClosed) {
+    const statusElement = document.getElementById('storeStatus');
+    const lastClosedElement = document.getElementById('lastClosedTime');
+
+    // Get current date
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format (e.g., "2025-04-28")
+
+    // Combine the current date with the time stored in lastClosed (e.g., "2025-04-28 15:09:23")
+    const fullDateTime = `${currentDate} ${lastClosed}`;
+
+    // Parse the combined date-time string
+    const lastClosedDate = new Date(fullDateTime);
+
+    // Get current Indian time
+    const istOffset = 5.5 * 60; // IST is UTC +5:30
+    const localOffset = now.getTimezoneOffset();
+    const istTime = new Date(now.getTime() + (istOffset + localOffset) * 60000);
+
+    // Parse Firebase time
+    const firebaseTime = new Date(time);
+
+    // Calculate difference in minutes
+    const diffMs = Math.abs(istTime - firebaseTime);
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (!time || diffMins > 10) {
+      statusElement.textContent = "CONNECT ERROR";
+      statusElement.className = "status error";
+      lastClosedElement.textContent = "";
+    } else {
+      if (status.toLowerCase() === "open") {
+        statusElement.textContent = "OPEN";
+        statusElement.className = "status open";
+        lastClosedElement.textContent = "";
+      } else {
+        statusElement.textContent = "CLOSED";
+        statusElement.className = "status closed";
+        
+        // Check if lastClosedDate is valid
+        if (!isNaN(lastClosedDate.getTime())) {
+          // If valid date, display it
+          lastClosedElement.textContent = "Last Closed: " + lastClosedDate.toLocaleString();
+        } else {
+          lastClosedElement.textContent = "Last Closed: Not available";
+        }
+      }
+    }
+  }
+
+  dbRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    console.log("Firebase Data:", data);  // Log the data to check the structure
+    
+    const status = data?.status || "closed";
+    const time = data?.time || "";
+    const lastClosed = data?.lastClosed || "";
+    updateStatus(status, time, lastClosed);
+  }, (error) => {
+    console.error(error);
+    const statusElement = document.getElementById('storeStatus');
+    const lastClosedElement = document.getElementById('lastClosedTime');
+    statusElement.textContent = "CONNECT ERROR";
+    statusElement.className = "status error";
+    lastClosedElement.textContent = "";
+  });
+</script>
+
+</body>
+</html>
